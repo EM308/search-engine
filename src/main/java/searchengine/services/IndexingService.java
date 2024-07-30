@@ -20,7 +20,6 @@ import searchengine.dto.response.IndexingResponse;
 import searchengine.services.CRUD.PageCRUDService;
 import searchengine.services.CRUD.SiteCRUDService;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ForkJoinPool;
@@ -43,7 +42,7 @@ public class IndexingService {
     @Autowired
     private final SitesList sites;
     @Autowired
-    private final LemmaService lemmaService;
+    private final IndexingPageService indexingPageService;
     private volatile static Boolean isIndexing = false;
     private ForkJoinPool forkJoinPool;
     public ResponseEntity<IndexingResponse> startIndexing(){
@@ -78,7 +77,7 @@ public class IndexingService {
                 Elements div = page.select("a");
                 searchengine.model.Site siteFind = siteRepository.findByUrl(site.getUrl()).get();
                 siteDto = SiteCRUDService.mapToDto(siteFind);
-                UrlSearch urlSearch = new UrlSearch(siteFind, div, pageCRUDService, pageRepository, lemmaService);
+                UrlSearch urlSearch = new UrlSearch(siteFind, div, pageCRUDService, pageRepository, indexingPageService);
                 forkJoinPool.invoke(urlSearch);
                 siteDto.setStatus("INDEXED");
                 siteCRUDService.update(siteDto);
@@ -128,9 +127,9 @@ public class IndexingService {
                 deletePage.forEach(indexRepository::deleteAllByPageId);
             }
             try{
-                siteCRUDService.update(LemmaService.createSiteDtoIndexing(site));
+                siteCRUDService.update(IndexingPageService.createSiteDtoIndexing(site));
             } catch (Exception e) {
-                siteCRUDService.create(LemmaService.createSiteDtoIndexing(site));
+                siteCRUDService.create(IndexingPageService.createSiteDtoIndexing(site));
             }
         }
     }

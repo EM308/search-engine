@@ -22,12 +22,12 @@ public class UrlSearch extends RecursiveTask<ArrayList<UrlSearch>> {
     private ArrayList<UrlSearch> returnList = new ArrayList<>();
     private final PageCRUDService pageCRUDService;
     private final PageRepository pageRepository;
-    private final LemmaService lemmaService;
+    private final IndexingPageService indexingPageService;
     private Elements div;
-    UrlSearch(Site url, Elements div, PageCRUDService pageCRUDService, PageRepository pageRepository, LemmaService lemmaService) {
+    UrlSearch(Site url, Elements div, PageCRUDService pageCRUDService, PageRepository pageRepository, IndexingPageService indexingPageService) {
         this.url = url;
         this.div = div;
-        this.lemmaService = lemmaService;
+        this.indexingPageService = indexingPageService;
         this.pageCRUDService = pageCRUDService;
         this.pageRepository = pageRepository;
     }
@@ -58,9 +58,9 @@ public class UrlSearch extends RecursiveTask<ArrayList<UrlSearch>> {
     private void newPageSelect(Document newPage, int statusCode, PageDto pageDto){
         Elements div = newPage.select("a");
         if(statusCode < 400 && !div.isEmpty()) {
-            Runnable runnable = () -> lemmaService.indexing(pageDto);
+            Runnable runnable = () -> indexingPageService.indexing(pageDto);
             new Thread(runnable).start();
-            UrlSearch urlSearch = new UrlSearch(url, div, pageCRUDService, pageRepository, lemmaService);
+            UrlSearch urlSearch = new UrlSearch(url, div, pageCRUDService, pageRepository, indexingPageService);
             urlSearch.fork();
             urlSearches.add(urlSearch);
         }

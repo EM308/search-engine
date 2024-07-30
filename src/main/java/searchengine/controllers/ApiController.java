@@ -15,13 +15,13 @@ public class ApiController {
     private final StatisticsService statisticsService;
     private final StatisticsServiceImpl statisticsServiceIpml;
     private final IndexingService indexingService;
-    private final LemmaService lemmaService;
+    private final IndexingPageService indexingPageService;
     private final SearchService searchService;
-    public ApiController(StatisticsService statisticsService, StatisticsServiceImpl statisticsServiceIpml, IndexingService indexingService, LemmaService lemmaService, SearchService searchService) {
+    public ApiController(StatisticsService statisticsService, StatisticsServiceImpl statisticsServiceIpml, IndexingService indexingService, IndexingPageService indexingPageService, SearchService searchService) {
         this.statisticsService = statisticsService;
         this.statisticsServiceIpml = statisticsServiceIpml;
         this.indexingService = indexingService;
-        this.lemmaService = lemmaService;
+        this.indexingPageService = indexingPageService;
         this.searchService = searchService;
     }
     @GetMapping("/statistics")
@@ -38,7 +38,7 @@ public class ApiController {
     }
     @PostMapping("/indexPage")
     public ResponseEntity<IndexingResponse> indexPage(@RequestBody String url){
-        return lemmaService.indexPage(url);
+        return indexingPageService.indexPage(url);
     }
     @GetMapping("/search")
     public ResponseEntity<SearchResponse> search(@RequestParam String query,

@@ -37,7 +37,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Getter
-public class LemmaService {
+public class IndexingPageService {
     @Autowired
     private final PageRepository pageRepository;
     @Autowired
