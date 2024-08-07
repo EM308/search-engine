@@ -1,5 +1,6 @@
 package searchengine.services;
 
+import lombok.SneakyThrows;
 import org.apache.lucene.morphology.LuceneMorphology;
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.jsoup.nodes.Document;

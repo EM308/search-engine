@@ -71,16 +71,18 @@ public class IndexingPageService {
 
                     deletePage(path);
                     final PageDto pageDto = createPage(url, path, site);
-                    Runnable runnable = () -> indexing(pageDto);
+                    Runnable runnable = () -> {
+                        indexing(pageDto);
+                    };
                     new Thread(runnable).start();
 
                     indexingResponse.setResult(true);
 
                     return ResponseEntity.ok(indexingResponse);
-                } catch (Exception e){
+                } catch (IOException e){
                     indexingResponse.setResult(false);
                     indexingResponse.setError("Указанная страница не найдена");
-                    return new ResponseEntity<>(indexingResponse, HttpStatus.NOT_FOUND);
+                   return new ResponseEntity<>(indexingResponse, HttpStatus.NOT_FOUND);
                 }
             }
         }
@@ -90,7 +92,7 @@ public class IndexingPageService {
         return ResponseEntity.ok(indexingResponse);
     }
     @SneakyThrows
-    public void indexing(PageDto pageDto){
+    public void indexing(PageDto pageDto) {
         Document page = Jsoup.parse(pageDto.getContent());
         HashMap<String, Integer> lemma = CreateLemma.getLemmaMap(page);
         for (Map.Entry<String, Integer> entry : lemma.entrySet()) {
@@ -149,8 +151,7 @@ public class IndexingPageService {
                 .ignoreContentType(true)
                 .timeout(0)
                 .followRedirects(false)
-                .get();;
-
+                .get();
         pageDto.setPath(path);
         pageDto.setSite(siteRepository.findByName(site.getName()).get().getName());
         int statusCode = page.connection().execute().statusCode();

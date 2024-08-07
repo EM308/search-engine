@@ -11,6 +11,7 @@ import searchengine.model.Site;
 import searchengine.repositories.PageRepository;
 import searchengine.services.CRUD.PageCRUDService;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.RecursiveTask;
 
@@ -55,10 +56,13 @@ public class UrlSearch extends RecursiveTask<ArrayList<UrlSearch>> {
         }
         return returnList;
     }
+
     private void newPageSelect(Document newPage, int statusCode, PageDto pageDto){
         Elements div = newPage.select("a");
         if(statusCode < 400 && !div.isEmpty()) {
-            Runnable runnable = () -> indexingPageService.indexing(pageDto);
+            Runnable runnable = () -> {
+                indexingPageService.indexing(pageDto);
+            };
             new Thread(runnable).start();
             UrlSearch urlSearch = new UrlSearch(url, div, pageCRUDService, pageRepository, indexingPageService);
             urlSearch.fork();

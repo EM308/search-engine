@@ -20,7 +20,9 @@ import searchengine.dto.response.IndexingResponse;
 import searchengine.services.CRUD.PageCRUDService;
 import searchengine.services.CRUD.SiteCRUDService;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.ForkJoinPool;
 
@@ -59,7 +61,6 @@ public class IndexingService {
         }
     }
 
-    @SneakyThrows
     private void indexing(){
         isIndexing = true;
         forkJoinPool = new ForkJoinPool();
@@ -82,7 +83,7 @@ public class IndexingService {
                 siteDto.setStatus("INDEXED");
                 siteCRUDService.update(siteDto);
             }
-            catch (Exception e) {
+            catch (NoSuchElementException | IOException e) {
                 if(!siteRepository.findByUrl(site.getUrl()).get().getStatus().equals("FAILED")) {
                     siteDto.setName(site.getName());
                     siteDto.setStatus("FAILED");
@@ -117,7 +118,7 @@ public class IndexingService {
         indexingResponse.setResult(true);
         return ResponseEntity.ok(indexingResponse);
     }
-    @SneakyThrows
+
     public void createSites(){
         for (Site site: sites.getSites()) {
             Optional<searchengine.model.Site> siteFind = siteRepository.findByName(site.getName());
@@ -136,15 +137,5 @@ public class IndexingService {
     public static Boolean getIndexing() {
         return isIndexing;
     }
-    /*public static Document createConnection(String url) throws IOException {
-        return Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6")
-                .referrer("http://www.google.com")
-                .ignoreContentType(true)
-                .timeout(0)
-                .followRedirects(false)
-                .get();
-    }
 
-     */
 }

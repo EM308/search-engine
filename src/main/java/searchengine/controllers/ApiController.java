@@ -1,5 +1,6 @@
 package searchengine.controllers;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import searchengine.dto.response.SearchResponse;
@@ -8,6 +9,8 @@ import searchengine.dto.response.IndexingResponse;
 import searchengine.services.*;
 import searchengine.services.Statistics.StatisticsService;
 import searchengine.services.Statistics.StatisticsServiceImpl;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api")
@@ -41,10 +44,17 @@ public class ApiController {
         return indexingPageService.indexPage(url);
     }
     @GetMapping("/search")
-    public ResponseEntity<SearchResponse> search(@RequestParam String query,
+    public ResponseEntity<?> search(@RequestParam String query,
                                                  @RequestParam(required = false) String site,
                                                  @RequestParam(required = false, defaultValue = "0") int offset,
                                                  @RequestParam(required = false, defaultValue = "20") int limit){
-        return searchService.search(query, site, offset, limit);
+        try {
+            return searchService.search(query, site, offset, limit);
+        } catch (IOException e) {
+            SearchResponse searchResponse = new SearchResponse();
+            searchResponse.setResult(false);
+            searchResponse.setError("Указанная страница не найдена");
+            return new ResponseEntity<>(searchResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 }

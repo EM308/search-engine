@@ -19,6 +19,7 @@ import searchengine.repositories.IndexRepository;
 import searchengine.repositories.LemmaRepository;
 import searchengine.repositories.PageRepository;
 
+import java.io.IOException;
 import java.util.*;
 
 @Service
@@ -28,21 +29,21 @@ public class SearchService {
     private final LemmaRepository lemmaRepository;
     private final PageRepository pageRepository;
     private final IndexRepository indexRepository;
-    @SneakyThrows
-    public ResponseEntity<SearchResponse> search(String query, String site, int offset, int limit) {
+
+    public ResponseEntity<SearchResponse> search(String query, String site, int offset, int limit) throws IOException {
         if(query.isEmpty()){
             return errorResponse("Задан пустой поисковый запрос");
         }
         Document doc = Jsoup.parse(query);
         HashMap<String, Integer> lemmaInQueryMap = CreateLemma.getLemmaMap(doc);
-        List<Lemma> lemmaInQueryList = createLemmaInQueryList(lemmaInQueryMap);
+        List<Lemma> requiredLemmaInQuery = getLemmasWithoutFrequent(lemmaInQueryMap.keySet());
         List<Page> pageList;
         try {
-            pageList = createListPage(lemmaInQueryList, site);
+            pageList = createListPage(requiredLemmaInQuery, site);
         } catch (Exception e){
             return errorResponse("Указанная страница не найдена");
         }
-        List<Map.Entry<Float, Page>> listPageEntryRelevance= createListPageRevelance(pageList);
+        List<Map.Entry<Float, Page>> listPageEntryRelevance= getPageSortRelevance(pageList, requiredLemmaInQuery);
         List<SearchData> searchDataList = new ArrayList<>();
         int size = Math.min(offset + limit, listPageEntryRelevance.size());
         for (int i = offset; i < size; i++) {
@@ -51,7 +52,7 @@ public class SearchService {
             Document document = Jsoup.parse(value.getContent());
 
             Set<String> lemmaInPageForm = lemmaSnippet(document, lemmaInQueryMap.keySet());
-            String snippet = createSnippet(lemmaInPageForm, document.text());
+            String snippet = getSnippet(lemmaInPageForm, document.text());
             SearchData searchData = new SearchData();
             searchData.setSite(value.getSiteId().getUrl());
             searchData.setSiteName(value.getSiteId().getName());
@@ -69,9 +70,7 @@ public class SearchService {
         searchResponse.setData(searchDataList);
         return ResponseEntity.ok(searchResponse);
     }
-
-    @SneakyThrows
-    private Set<String> lemmaSnippet(Document page, Set<String> wordQuery){
+    private Set<String> lemmaSnippet(Document page, Set<String> wordQuery) throws IOException {
         Set<String> lemmaSet = new HashSet<>();
         LuceneMorphology luceneMorph = new RussianLuceneMorphology();
         List<String> listWordsPage = CreateLemma.toWords(page.text());
@@ -85,9 +84,9 @@ public class SearchService {
         }
         return lemmaSet;
     }
-    private String createSnippet(Set<String> snippetPageSet, String textPage){
+    private String getSnippet(Set<String> lemmaPageSet, String textPage){
         textPage = textPage.replaceAll("</?.?.>", "");
-        for (String snippet : snippetPageSet){
+        for (String snippet : lemmaPageSet){
             textPage = textPage.replaceAll(snippet + " ", "<b>" + snippet + "</b> ");
             textPage = textPage.replaceAll(snippet + ",", "<b>" + snippet + "</b>,");
             textPage = textPage.replaceAll(snippet + "\\.", "<b>" + snippet + "</b>.");
@@ -96,9 +95,9 @@ public class SearchService {
         textPage = textPage.replaceAll("</b> ?<b>", " ");
 
         int countWords = StringUtils.countMatches(textPage, "<b>");
-        return getSnippet(textPage, countWords);
+        return createSnippetFromText(textPage, countWords);
     }
-    private String getSnippet(String textPage, int countWords){
+    private String createSnippetFromText(String textPage, int countWords){
         StringBuilder snippet = new StringBuilder();
 
         boolean LotOfWords = countWords > 5;
@@ -140,16 +139,15 @@ public class SearchService {
     }
 
 
-    private List<Lemma> createLemmaInQueryList(HashMap<String, Integer> lemmsInQueryMap){
+    private List<Lemma> getLemmasWithoutFrequent(Set<String> lemmsInQuery){
         int pageCount = (int) pageRepository.count();
         int highFrequency = pageCount * LARGE_PERCENTAGE_MATCHES / 100;
         List<Lemma> lemmaInQueryList = new ArrayList<>();
-        for (Map.Entry<String, Integer> entry : lemmsInQueryMap.entrySet()) {
-            String key = entry.getKey();
-            Optional<Lemma> lemma = lemmaRepository.findByLemma(key);
-            if(lemma.isPresent()){
-                if(lemma.get().getFrequency() < highFrequency){
-                    lemmaInQueryList.add(lemma.get());
+        for (String lemma : lemmsInQuery) {
+            Optional<Lemma> lemmaOptional = lemmaRepository.findByLemma(lemma);
+            if(lemmaOptional.isPresent()){
+                if(lemmaOptional.get().getFrequency() < highFrequency){
+                    lemmaInQueryList.add(lemmaOptional.get());
                 }
             }
         }
@@ -162,30 +160,32 @@ public class SearchService {
         searchResponse.setError(error);
         return new ResponseEntity<>(searchResponse, HttpStatus.NOT_FOUND);
     }
-    private List<Map.Entry<Float, Page>> createListPageRevelance(List<Page> pageList){
-        float relevanceABS = (float) 0;
+    private List<Map.Entry<Float, Page>> getPageSortRelevance(List<Page> pageList, List<Lemma> requiredLemma){
+        float relevanceAbsolute = (float) 0;
         Map<Float, Page> pageMapRelevance = new HashMap<>();
         for (Page page: pageList){
-            List<Index> indexList1 = indexRepository.findAllByPageId(page);
-            for (Index index: indexList1){
-                relevanceABS = relevanceABS + index.getRank();
+            List<Index> indexList = indexRepository.findAllByPageId(page);
+            for (Index index: indexList){
+                if (requiredLemma.contains(index.getLemmaId())) {
+                    relevanceAbsolute = relevanceAbsolute + index.getRank();
+                }
             }
-            pageMapRelevance.put(relevanceABS, page);
+            pageMapRelevance.put(relevanceAbsolute, page);
         }
         Set<Float> keys = pageMapRelevance.keySet();
-        Float revelanceRel = Collections.max(keys);
+        Float relevanceRelative = Collections.max(keys);
         Map<Float, Page> newPageMap = new HashMap<>();
         for (Map.Entry<Float, Page> entry : pageMapRelevance.entrySet()) {
             float key = entry.getKey();
             Page value = entry.getValue();
-            newPageMap.put(key / revelanceRel, value);
+            newPageMap.put(key / relevanceRelative, value);
         }
         Comparator<Map.Entry<Float, Page>> pageComparator = Comparator.comparing(Map.Entry::getKey);
         Comparator<Map.Entry<Float, Page>> pageComparatorReversed = pageComparator.reversed();
-        List<Map.Entry<Float, Page>> listPageEntryRelevance =  newPageMap.entrySet()
+        List<Map.Entry<Float, Page>> sortedList = newPageMap.entrySet()
                 .stream()
                 .sorted(pageComparatorReversed).toList();
-        return listPageEntryRelevance;
+        return sortedList;
     }
 
     private List<Page> createListPage(List<Lemma> lemmaInQueryList, String site) throws Exception {
